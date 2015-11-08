@@ -18,21 +18,17 @@ package Proc::Fork::Control;
 #
 #        Original author: Colin Faber <cfaber@fpsn.net>
 # Original creation date: 10/02/2014
-#                Version: $Id: Control.pm,v 1.2 2014/10/03 02:51:42 cfaber Exp $
+#                Version: $Id: Control.pm,v 1.3 2015/11/09 03:34:25 cfaber Exp $
 # 
 
 # Version number - cvs automagically updated.
-our $VERSION = $1 if('$Revision: 1.2 $' =~ /: ([\d\.]+) \$/);
+our $VERSION = $1 if('$Revision: 1.3 $' =~ /: ([\d\.]+) \$/);
 
 use strict;
 use POSIX ('WNOHANG','setsid');
+use Time::HiRes 'usleep';
 
 require Exporter;
-
-# Try and use high resolution timing
-if(eval 'use Time::HiRes qw(usleep); 1;'){
-	$Proc::Fork::Control::HEAP->{has_thr} = 1;
-}
 
 # Exported routines
 our @ISA = ('Exporter');
@@ -62,7 +58,7 @@ our @EXPORT = qw(
 
 require 5.008;
 
-$Proc::Fork::Control::VERSION = '$Revision: 1.2 $';
+$Proc::Fork::Control::VERSION = '$Revision: 1.3 $';
 
 =head1 NAME
 
@@ -150,11 +146,7 @@ sub cfork {
 			last;
 		}
 
-		if($Proc::Fork::Control::HEAP->{has_thr}){
-			cfork_usleep(5000);
-		} else {
-			cfork_sleep(1);
-		}
+		cfork_usleep(5);
 	}
 
 	if($Proc::Fork::Control::HEAP->{is_child}){
@@ -185,11 +177,7 @@ sub cfork {
 		while(1){
 			_cleanup();
 			last if !$Proc::Fork::Control::HEAP->{children};
-			if($Proc::Fork::Control::HEAP->{has_thr}){
-				cfork_usleep(5000);
-			} else {	
-				cfork_sleep(1);
-			}
+			cfork_usleep(5);
 		}
  	}
 
@@ -322,11 +310,7 @@ sub cfork_wait {
 			last;
 		}
 
-		if($Proc::Fork::Control::HEAP->{has_thr}){
-			cfork_usleep(5000);
-		} else {
-			cfork_sleep(1);
-		}
+		cfork_usleep(5);
 	}
 
 	return 1;
@@ -412,7 +396,6 @@ This function is only avaliable if Time::HiRes is avaliable otherwise it will si
 
 sub cfork_usleep {
 	my $sleep = $_[0];
-	return if $sleep !~ /^\d+$/ || !$Proc::Fork::Control::HEAP->{has_thr};
 
 	my $sleeper = 0;
 	my $slept = 0;
