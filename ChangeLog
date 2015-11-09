@@ -1,2 +1,10 @@
-11/08/2014 v 1.3	Time::HiRes is now required
+11/09/2015 v 1.4	Proc::Fork::Control should use cfork_exit() internally to
+			to avoid losing exit signals.
+
+			Avoid excessive delays in blocking mode while at the same
+			time keeping CPU usage down.
+
+			Improved documentation on cfork_nonblocking() mode
+
+11/08/2015 v 1.3	Time::HiRes is now required
 10/03/2014 v.1.2	Initial public release

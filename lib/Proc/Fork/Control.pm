@@ -18,11 +18,11 @@ package Proc::Fork::Control;
 #
 #        Original author: Colin Faber <cfaber@fpsn.net>
 # Original creation date: 10/02/2014
-#                Version: $Id: Control.pm,v 1.3 2015/11/09 03:34:25 cfaber Exp $
+#                Version: $Id: Control.pm,v 1.4 2015/11/09 20:33:26 cfaber Exp $
 # 
 
 # Version number - cvs automagically updated.
-our $VERSION = $1 if('$Revision: 1.3 $' =~ /: ([\d\.]+) \$/);
+our $VERSION = $1 if('$Revision: 1.4 $' =~ /: ([\d\.]+) \$/);
 
 use strict;
 use POSIX ('WNOHANG','setsid');
@@ -58,7 +58,7 @@ our @EXPORT = qw(
 
 require 5.008;
 
-$Proc::Fork::Control::VERSION = '$Revision: 1.3 $';
+$Proc::Fork::Control::VERSION = '$Revision: 1.4 $';
 
 =head1 NAME
 
@@ -140,14 +140,38 @@ sub cfork {
 		$Proc::Fork::Control::HEAP->{max_children} = 0;
 	}
 
+	my ($i, $delay);
 	while(1){
-		_cleanup();
+		my $cl =_cleanup();
+
 		if($Proc::Fork::Control::HEAP->{children} < $Proc::Fork::Control::HEAP->{max_children}){
 			last;
 		}
 
-		cfork_usleep(5);
-	}
+		if($Proc::Fork::Control::HEAP->{children}){
+			if($cl){
+				# There are still children alive, and we've cleaned up at least 1 
+				# child on the last iteration so don't delay at all.
+				$i = 0;
+				$delay = 0;
+			} else {
+				# There are still children alive, delay based on the number of interations
+				# Minimum delay time (in micro seconds)
+				$delay ||= 5;
+
+				# iterator for delay multiplication.
+				$i++;
+
+				$delay = $delay * $i;
+
+				# Maximum delay value
+				$delay = ($delay > 5000 ? 5000 : $delay);
+
+				# sleep for a while..
+				cfork_usleep($delay);
+			}
+		}
+        }
 
 	if($Proc::Fork::Control::HEAP->{is_child}){
 		$Proc::Fork::Control::HEAP->{has_children} = 1;
@@ -170,23 +194,31 @@ sub cfork {
 			}               
 		}
 
-		exit(2);
+		cfork_exit(2);
  	} 
 
-	if($Proc::Fork::Control::HEAP->{has_children} && !$Proc::Fork::Control::HEAP->{nonblocking}){
-		while(1){
-			_cleanup();
-			last if !$Proc::Fork::Control::HEAP->{children};
-			cfork_usleep(5);
-		}
- 	}
+	# Wait for children to finish (if nonblocking
+	cfork_wait();
 
+	# Return our PID for further use.
 	return $pid;
 } 
 
 =head2 cfork_nonblocking(BOOL)
 
 Set the cfork() behavior to nonblocking mode if <BOOL> is true, This will result in the fork returning right away rather than waiting for any possible children to die.
+
+Also, cfork_nonblocking() should always be turned off after the bit of code you want to run, runs.
+
+=item EXAMPLE
+
+ cfork_nonblocking(0);
+
+ cfork(sub {
+	do some work;
+ });
+
+ cfork_nonblocking(1);
 
 =cut
 
@@ -302,15 +334,40 @@ sub cfork_wait {
 	return 1 if $Proc::Fork::Control::HEAP->{nonblocking};
 
 	$to = time + $to if $to;
+
+	my ($i, $delay);
 	while(1){
-		_cleanup();
+		my $cl =_cleanup();
+
 		if(!$Proc::Fork::Control::HEAP->{children}){
 			last;
 		} elsif($to && time >= $to){
 			last;
 		}
 
-		cfork_usleep(5);
+		if($Proc::Fork::Control::HEAP->{children}){
+			if($cl){
+				# There are still children alive, and we've cleaned up at least 1 
+				# child on the last iteration so don't delay at all.
+				$i = 0;
+				$delay = 0;
+			} else {
+				# There are still children alive, delay based on the number of interations
+				# Minimum delay time (in micro seconds)
+				$delay ||= 5;
+
+				# iterator for delay multiplication.
+				$i++;
+
+				$delay = $delay * $i;
+
+				# Maximum delay value
+				$delay = ($delay > 5000 ? 5000 : $delay);
+
+				# sleep for a while..
+				cfork_usleep($delay);
+			}
+		}
 	}
 
 	return 1;
@@ -472,7 +529,7 @@ sub cfork_list_children {
 	}
 
 	if($use_hash){
-		return %{ $Proc::Fork::Control::HEAP->{cidlist} };
+		return (%{ $Proc::Fork::Control::HEAP->{cidlist} });
 	} else {
 		return keys %{ $Proc::Fork::Control::HEAP->{cidlist} };
 	}
@@ -516,23 +573,32 @@ sub _sigchld {
 
 # clean up lists - thanks to gmargo@perlmonks for this idea.
 sub _cleanup {
+	my $i = 0;
 	my @dpid = grep { $Proc::Fork::Control::HEAP->{cidlist}->{$_} == 0 } keys %{ $Proc::Fork::Control::HEAP->{cidlist} };
 	if(@dpid){
 		for(@dpid){
-			delete $Proc::Fork::Control::HEAP->{cidlist}->{$_};
-			$Proc::Fork::Control::HEAP->{children} -- if $Proc::Fork::Control::HEAP->{children};        
+			if(exists $Proc::Fork::Control::HEAP->{cidlist}->{$_}){
+				delete $Proc::Fork::Control::HEAP->{cidlist}->{$_};
+				$i++;
+
+				$Proc::Fork::Control::HEAP->{children} -- if $Proc::Fork::Control::HEAP->{children};        
+			}
 		}
 	}
 
 	# Do some additional checks to see if these children are really alive.
 	for(keys %{ $Proc::Fork::Control::HEAP->{cidlist} }){
 		if(!kill(0, $_)){
-			delete $Proc::Fork::Control::HEAP->{cidlist}->{$_};
-			$Proc::Fork::Control::HEAP->{children} -- if $Proc::Fork::Control::HEAP->{children};
+			if(exists $Proc::Fork::Control::HEAP->{cidlist}->{$_}){
+				delete $Proc::Fork::Control::HEAP->{cidlist}->{$_};
+				$i++;
+
+				$Proc::Fork::Control::HEAP->{children} -- if $Proc::Fork::Control::HEAP->{children};
+			}
 		}
 	}
 
-	return 1;
+	return $i;
 }
 
 1;
