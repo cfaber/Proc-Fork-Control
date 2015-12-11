@@ -18,11 +18,11 @@ package Proc::Fork::Control;
 #
 #        Original author: Colin Faber <cfaber@fpsn.net>
 # Original creation date: 10/02/2014
-#                Version: $Id: Control.pm,v 1.4 2015/11/09 20:33:26 cfaber Exp $
+#                Version: $Id: Control.pm,v 1.5 2015/12/13 01:42:05 cfaber Exp $
 # 
 
 # Version number - cvs automagically updated.
-our $VERSION = $1 if('$Revision: 1.4 $' =~ /: ([\d\.]+) \$/);
+our $VERSION = $1 if('$Revision: 1.5 $' =~ /: ([\d\.]+) \$/);
 
 use strict;
 use POSIX ('WNOHANG','setsid');
@@ -35,6 +35,7 @@ our @ISA = ('Exporter');
 our @EXPORT = qw(
 	cfork
 	cfork_wait
+	cfork_wait_pid
 	cfork_init
 	cfork_exit
 	cfork_exit_code
@@ -58,7 +59,7 @@ our @EXPORT = qw(
 
 require 5.008;
 
-$Proc::Fork::Control::VERSION = '$Revision: 1.4 $';
+$Proc::Fork::Control::VERSION = '$Revision: 1.5 $';
 
 =head1 NAME
 
@@ -372,6 +373,34 @@ sub cfork_wait {
 
 	return 1;
 }
+
+=head2 cfork_wait_pid(PID, PID, PID, ..)
+
+cfork_wait_pid() functions much like cfork_wait() with the exception that it expects a list of PID's and blocks until those PID's have died off.  Like cfork_wait(), cfork_wait_pid() will NOT block if cfork_nonblocking() mode is enabled.
+
+=cut
+
+sub cfork_wait_pid {
+	my (@PID) = @_;
+
+	return 1 if $Proc::Fork::Control::HEAP->{nonblocking};
+
+	my $block;
+	while(1){
+		for(my $i = 0; $i < @PID; $i++){
+			if(!kill(undef, $PID[$i])){
+				delete $PID[$i];
+			}
+		}
+
+		last if !@PID;
+
+		cfork_usleep(5000);
+	}
+
+	return 1;
+}
+
 
 =head2 cfork_active_children()
 

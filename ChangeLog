@@ -1,3 +1,6 @@
+12/11/2015 v 1.5	Added cfork_wait_pid() routine to allow a list of PID's to
+			be waited on.
+
 11/09/2015 v 1.4	Proc::Fork::Control should use cfork_exit() internally to
 			to avoid losing exit signals.
 
