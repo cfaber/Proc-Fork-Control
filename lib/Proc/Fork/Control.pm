@@ -18,11 +18,11 @@ package Proc::Fork::Control;
 #
 #        Original author: Colin Faber <cfaber@fpsn.net>
 # Original creation date: 10/02/2014
-#                Version: $Id: Control.pm,v 1.5 2015/12/13 01:42:05 cfaber Exp $
+#                Version: $Id: Control.pm,v 1.6 2015/12/14 16:38:54 cfaber Exp $
 # 
 
 # Version number - cvs automagically updated.
-our $VERSION = $1 if('$Revision: 1.5 $' =~ /: ([\d\.]+) \$/);
+our $VERSION = $1 if('$Revision: 1.6 $' =~ /: ([\d\.]+) \$/);
 
 use strict;
 use POSIX ('WNOHANG','setsid');
@@ -59,7 +59,7 @@ our @EXPORT = qw(
 
 require 5.008;
 
-$Proc::Fork::Control::VERSION = '$Revision: 1.5 $';
+$Proc::Fork::Control::VERSION = '$Revision: 1.6 $';
 
 =head1 NAME
 
@@ -387,11 +387,14 @@ sub cfork_wait_pid {
 
 	my $block;
 	while(1){
+		my @TPID;
 		for(my $i = 0; $i < @PID; $i++){
-			if(!kill(undef, $PID[$i])){
-				delete $PID[$i];
+			if(kill(undef, $PID[$i])){
+				push @TPID, $PID[$i];
 			}
 		}
+
+		@PID = (@TPID);
 
 		last if !@PID;
 

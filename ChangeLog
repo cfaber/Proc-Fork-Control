@@ -1,3 +1,6 @@
+12/14/2015 v 1.6	cfork_wait_pid() has a bug, as a result of a deprecated
+			usage of `delete' function. This has now been corrected.
+
 12/11/2015 v 1.5	Added cfork_wait_pid() routine to allow a list of PID's to
 			be waited on.
 
