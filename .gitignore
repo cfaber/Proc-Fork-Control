@@ -1,0 +1,14 @@
+blib/
+Makefile
+META.yml
+META.json
+MYMETA.yml
+MYMETA.json
+pm_to_blib
+*.tar.gz
+MANIFEST.bak
+cover_db/
+*~
+*.bak
+*,bk
+*,new
